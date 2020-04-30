@@ -60,7 +60,17 @@ module.exports = app => {
               owner: `${repositoryOwnerLogin}`,
               issue_number: issueNumber,
               labels: [`${deployEnvironment}`]
-            })
+            });
+
+            // when this is the last deployment stage, also close the issue
+            if(process.env.LAST_DEPLOYMENT_ENV_NAME && deployEnvironment === process.env.LAST_DEPLOYMENT_ENV_NAME) {
+              context.github.issues.update({
+                repo: `${repositoryName}`,
+                owner: `${repositoryOwnerLogin}`,
+                issue_number: issueNumber,
+                status: "closed"
+              })
+            }
           });
 
         });
