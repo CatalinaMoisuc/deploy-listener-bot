@@ -4,7 +4,7 @@
   "private": true,
   "description": "A Github App that listens to deployments and labels your issues with the environment name in which was deployed.",
   "author": "Catalina Moisuc",
-  "license": "MIT",
+  "license": "ISC",
   "repository": "https://github.com/CatalinaMoisuc/deploy-listener-bot.git",
   "homepage": "https://github.com/CatalinaMoisuc/deploy-listener-bot",
   "bugs": "https://github.com/CatalinaMoisuc/deploy-listener-bot/issues",
@@ -20,7 +20,7 @@
     "dev": "nodemon",
     "start": "probot run ./index.js",
     "lint": "standard --fix",
-    "test": "jest && standard",
+    "test": "DEBUG=nock.* jest && standard",
     "test:watch": "jest --watch --notify --notifyMode=change --coverage"
   },
   "dependencies": {

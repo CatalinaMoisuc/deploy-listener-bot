@@ -2,9 +2,10 @@ const nock = require('nock')
 // Requiring our app implementation
 const myProbotApp = require('..')
 const { Probot } = require('probot')
+
 // Requiring our fixtures
-const payload = require('./fixtures/issues.opened')
-const issueCreatedBody = { body: 'Thanks for opening this issue!' }
+const eventPayloadDeploymentStatus = require('./fixtures/event.deployment_status')
+
 const fs = require('fs')
 const path = require('path')
 
@@ -22,27 +23,43 @@ describe('My Probot app', () => {
 
   beforeEach(() => {
     nock.disableNetConnect()
-    probot = new Probot({ id: 123, cert: mockCert })
+
+    probot = new Probot({ id: 1, cert: mockCert })
     // Load our app into probot
     probot.load(myProbotApp)
   })
 
-  test('creates a comment when an issue is opened', async () => {
+  test('labels issue when deployment is successful', async () => {
+    // the post addLabelToIssue is timing out with jamine's default 5000ms
+    jest.setTimeout(6000)
+
     // Test that we correctly return a test token
     nock('https://api.github.com')
-      .post('/app/installations/2/access_tokens')
+      .post('/app/installations/321696/access_tokens')
       .reply(200, { token: 'test' })
 
-    // Test that a comment is posted
     nock('https://api.github.com')
-      .post('/repos/hiimbex/testing-things/issues/1/comments', (body) => {
-        expect(body).toMatchObject(issueCreatedBody)
-        return true
-      })
+      .get('/repos/Toto/testing-repo/compare/test-env-old...007')
+      .reply(200, { commits: [{ sha: '007' }] })
+
+    nock('https://api.github.com')
+      .get('/search/issues?q=007+repo:Toto/testing-repo')
+      .reply(200, { items: [{ body: '#1', number: '2' }] })
+
+    const addLabelToIssue = nock('https://api.github.com')
+      .post('/repos/Toto/testing-repo/issues/1/labels'
+        , (body) => {
+          expect(body).toMatchObject(['test-env'])
+          return true
+        }
+      )
       .reply(200)
 
     // Receive a webhook event
-    await probot.receive({ name: 'issues', payload })
+    await probot.receive({ name: 'deployment_status', payload: eventPayloadDeploymentStatus })
+
+    // the issue was labeled successfully
+    expect(addLabelToIssue.isDone()).toBe(true)
   })
 
   afterEach(() => {
@@ -50,9 +67,3 @@ describe('My Probot app', () => {
     nock.enableNetConnect()
   })
 })
-
-// For more information about testing with Jest see:
-// https://facebook.github.io/jest/
-
-// For more information about testing with Nock see:
-// https://github.com/nock/nock

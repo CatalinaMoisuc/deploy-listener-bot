@@ -11,10 +11,12 @@
 > * every time you deploy keep two tags `${env}-old` and `${env}` up to date, replacing `env` with the environment in
 > which you are deploying so that the bot can use the tags to figure out all the commits deployed since last time
 > * for each deployment environment that you have (`${env}`), make sure you have a label with the same name in github
+> * you can use the `CLOSING_ENV` environment variable to specify the last deployment environment in the chain so
+> that when your code is deployed there, the issues will not only be labeled, but also closed 
 >
-> This bot is meant to be used with any Kanban board that matched issues with columns based on labels, so you can use
-> any boards like: Github Projects, Codetree etc. and your issues would move to the right column every time you are
-> deploying a batch of commits.
+> This bot is meant to be used with any Kanban board that matches issues with columns/stages based on labels, so you
+> can use any boards like: Github Projects, Codetree etc. and your issues would move to the right column every time
+> you are making a deployment.
 >
 
 ## Setup

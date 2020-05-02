@@ -41,7 +41,7 @@ module.exports = app => {
         const { items } = data
 
         // for each pull request that contains a deployed commit hash
-        items.forEach(pr => {
+        for (const pr of items) {
           app.log(`Handling pr: ${pr.number}`)
           const body = pr.body
 
@@ -50,11 +50,11 @@ module.exports = app => {
           app.log(`Handling the following mentioned issues: ${issuesMentioned}`)
 
           // and label each issue mentioned in the PRs description with the environment label
-          issuesMentioned.forEach(issue => {
+          for (const issue of issuesMentioned) {
             const issueNumber = parseInt(issue.slice(1))
             app.log(`Handling issue: ${issueNumber}`)
 
-            context.github.issues.addLabels({
+            await context.github.issues.addLabels({
               repo: `${repositoryName}`,
               owner: `${repositoryOwnerLogin}`,
               issue_number: issueNumber,
@@ -62,27 +62,21 @@ module.exports = app => {
             })
 
             // when this is the last deployment stage, also close the issue
-            if (process.env.LAST_DEPLOYMENT_ENV_NAME && deployEnvironment === process.env.LAST_DEPLOYMENT_ENV_NAME) {
-              context.github.issues.update({
+            if (process.env.CLOSING_ENV && deployEnvironment === process.env.CLOSING_ENV) {
+              await context.github.issues.update({
                 repo: `${repositoryName}`,
                 owner: `${repositoryOwnerLogin}`,
                 issue_number: issueNumber,
                 state: 'closed'
               })
             }
-          })
-        })
+          }
+        }
       }
     }
   })
 
-  // app.on('*', async context => {
-  //  context.log({event: context.event, action: context.payload.action})
-  // })
-
-  // For more information on building apps:
-  // https://probot.github.io/docs/
-
-  // To get your app running against GitHub, see:
-  // https://probot.github.io/docs/development/
+  app.on('*', async context => {
+    context.log({ event: context.event, action: context.payload.action })
+  })
 }

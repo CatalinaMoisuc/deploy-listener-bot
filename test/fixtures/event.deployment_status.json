@@ -1,0 +1,19 @@
+{
+  "deployment_status": {
+    "state": "success"
+  },
+  "deployment": {
+    "id": 2,
+    "sha": "007",
+    "task": "deploy",
+    "environment": "test-env"
+  },
+  "action": "created",
+  "repository": {
+    "name": "testing-repo",
+    "full_name": "Toto/testing-repo",
+    "owner": {
+      "login": "Toto"
+    }
+  }
+}
