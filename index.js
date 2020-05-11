@@ -1,7 +1,11 @@
+require('custom-env').env(true)
 /**
  * This is the main entrypoint to the Probot app
  * @param {import('probot').Application} app
  */
+
+const KANBAN_COLUMN_LABELS_SEPARATOR = '|'
+
 module.exports = app => {
   // Your code here
   app.log('Yay, the app was loaded!')
@@ -61,13 +65,30 @@ module.exports = app => {
               labels: [`${deployEnvironment}`]
             })
 
-            // when this is the last deployment stage, also close the issue
-            if (process.env.CLOSING_ENV && deployEnvironment === process.env.CLOSING_ENV) {
+            // this is the last deployment stage, close the issue
+            const closingEnv = process.env.CLOSING_ENV
+            const kanbanColumns = process.env.KANBAN_COLUMN_LABELS
+            if (closingEnv && deployEnvironment === closingEnv) {
               await context.github.issues.update({
                 repo: `${repositoryName}`,
                 owner: `${repositoryOwnerLogin}`,
                 issue_number: issueNumber,
                 state: 'closed'
+              })
+            } else if (kanbanColumns && kanbanColumns.includes(KANBAN_COLUMN_LABELS_SEPARATOR)) {
+              // the previous column label should be removed on each deploy other than the last one
+              const indexOfDeployEnv = kanbanColumns.indexOf(`${deployEnvironment}`)
+              let previousLabel = kanbanColumns.slice(0, indexOfDeployEnv - 1)
+              // when there are more than two labels chained, get only the last one before the deploy env
+              if (previousLabel.includes('|')) {
+                previousLabel = previousLabel.slice(previousLabel.lastIndexOf('|') + 1, previousLabel.length)
+              }
+
+              await context.github.issues.removeLabel({
+                repo: `${repositoryName}`,
+                owner: `${repositoryOwnerLogin}`,
+                issue_number: issueNumber,
+                name: `${previousLabel}`
               })
             }
           }
