@@ -89,6 +89,10 @@ describe('My Probot app', () => {
       .post('/repos/Toto/testing-repo/issues/1/labels')
       .reply(200)
 
+    nock('https://api.github.com')
+      .delete('/repos/Toto/testing-repo/issues/1/labels/test-env')
+      .reply(200)
+
     const closeIssue = nock('https://api.github.com')
       .patch('/repos/Toto/testing-repo/issues/1'
         , (body) => {
