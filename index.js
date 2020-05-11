@@ -75,8 +75,10 @@ module.exports = app => {
                 issue_number: issueNumber,
                 state: 'closed'
               })
-            } else if (kanbanColumns && kanbanColumns.includes(KANBAN_COLUMN_LABELS_SEPARATOR)) {
-              // the previous column label should be removed on each deploy other than the last one
+            }
+
+            // the previous column label should be removed on each deployment
+            if (kanbanColumns && kanbanColumns.includes(KANBAN_COLUMN_LABELS_SEPARATOR)) {
               const indexOfDeployEnv = kanbanColumns.indexOf(`${deployEnvironment}`)
               let previousLabel = kanbanColumns.slice(0, indexOfDeployEnv - 1)
               // when there are more than two labels chained, get only the last one before the deploy env
