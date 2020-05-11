@@ -20,10 +20,11 @@
     "dev": "nodemon",
     "start": "probot run ./index.js",
     "lint": "standard --fix",
-    "test": "DEBUG=nock.* jest && standard",
+    "test": "NODE_ENV=test DEBUG=nock.* jest && standard",
     "test:watch": "jest --watch --notify --notifyMode=change --coverage"
   },
   "dependencies": {
+    "custom-env": "^2.0.1",
     "probot": "^9.5.3"
   },
   "devDependencies": {

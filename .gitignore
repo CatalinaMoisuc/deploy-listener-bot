@@ -2,7 +2,8 @@ node_modules
 npm-debug.log
 *.pem
 !mock-cert.pem
-.env
 coverage
 .idea
 *.iml
+/.env.prod
+.env
