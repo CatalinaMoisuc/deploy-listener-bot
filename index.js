@@ -67,7 +67,6 @@ module.exports = app => {
 
             // this is the last deployment stage, close the issue
             const closingEnv = process.env.CLOSING_ENV
-            const kanbanColumns = process.env.KANBAN_COLUMN_LABELS
             if (closingEnv && deployEnvironment === closingEnv) {
               await context.github.issues.update({
                 repo: `${repositoryName}`,
@@ -77,6 +76,7 @@ module.exports = app => {
               })
             }
 
+            const kanbanColumns = process.env.KANBAN_COLUMN_LABELS
             // the previous column label should be removed on each deployment
             if (kanbanColumns && kanbanColumns.includes(KANBAN_COLUMN_LABELS_SEPARATOR)) {
               const indexOfDeployEnv = kanbanColumns.indexOf(`${deployEnvironment}`)
