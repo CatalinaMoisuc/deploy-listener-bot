@@ -13,6 +13,15 @@
 > * for each deployment environment that you have (`${env}`), make sure you have a label with the same name in github
 > * you can use the `CLOSING_ENV` environment variable to specify the last deployment environment in the chain so
 > that when your code is deployed there, the issues will not only be labeled, but also closed 
+> * you should also specify the `KANBAN_COLUMN_LABELS`, separating each label that is matching a column on your board
+> separated by `|`. You should start with the column before the first deployment environment and end up with the
+> last deployment environment which would usually also match the `CLOSING_ENV`.
+> This `KANBAN_COLUMN_LABELS` configuration will ensure that your issues will be distributed on the columns accordingly
+>, so every time a deployment is made, the right label will be assigned to the issues, but also the label matching
+> the previous column will also be removed
+> so that the issue belongs only to one column at a given time
+>
+> Please check the example consiguration: `.env.example` for more details.
 >
 > This bot is meant to be used with any Kanban board that matches issues with columns/stages based on labels, so you
 > can use any boards like: Github Projects, Codetree etc. and your issues would move to the right column every time
