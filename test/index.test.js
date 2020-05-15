@@ -30,7 +30,7 @@ describe('My Probot app', () => {
     probot.load(myProbotApp)
   })
 
-  test('labels and unlabels issue when deployment is successful', async () => {
+  test('adds and removes labels issue when deployment is successful', async () => {
     // the post addLabelToIssue is timing out with jamine's default 5000ms
     jest.setTimeout(6000)
 
@@ -56,6 +56,10 @@ describe('My Probot app', () => {
       )
       .reply(200)
 
+    const getLabelsFromIssue = nock('https://api.github.com')
+      .get('/repos/Toto/testing-repo/issues/1')
+      .reply(200, { labels: [{ name: 'needs review' }] })
+
     const removeLabelFromIssue = nock('https://api.github.com')
       .delete('/repos/Toto/testing-repo/issues/1/labels/needs%20review')
       .reply(200)
@@ -65,7 +69,53 @@ describe('My Probot app', () => {
 
     // the issue was labeled and unlabeled successfully
     expect(addLabelToIssue.isDone()).toBe(true)
+    expect(getLabelsFromIssue.isDone()).toBe(true)
     expect(removeLabelFromIssue.isDone()).toBe(true)
+  })
+
+  test('removes multiple issue labels', async () => {
+    // the post addLabelToIssue is timing out with jamine's default 5000ms
+    jest.setTimeout(6000)
+
+    // Test that we correctly return a test token
+    nock('https://api.github.com')
+      .post('/app/installations/321696/access_tokens')
+      .reply(200, { token: 'test' })
+
+    nock('https://api.github.com')
+      .get('/repos/Toto/testing-repo/compare/test-env-old...007')
+      .reply(200, { commits: [{ sha: '007' }] })
+
+    nock('https://api.github.com')
+      .get('/search/issues?q=007+repo:Toto/testing-repo')
+      .reply(200, { items: [{ body: '#1', number: '2' }] })
+
+    nock('https://api.github.com')
+      .post('/repos/Toto/testing-repo/issues/1/labels'
+        , (body) => {
+          expect(body).toMatchObject(['test-env'])
+          return true
+        }
+      )
+      .reply(200)
+
+    nock('https://api.github.com')
+      .get('/repos/Toto/testing-repo/issues/1')
+      .reply(200, { labels: [{ name: 'needs review' }, { name: 'test-close' }] })
+
+    const removeNeedsReviewFromIssue = nock('https://api.github.com')
+      .delete('/repos/Toto/testing-repo/issues/1/labels/needs%20review')
+      .reply(200)
+
+    const removeTestCloseFromIssue = nock('https://api.github.com')
+      .delete('/repos/Toto/testing-repo/issues/1/labels/test-close')
+      .reply(200)
+
+    // Receive a webhook event
+    await probot.receive({ name: 'deployment_status', payload: eventPayloadTestEnv })
+
+    expect(removeNeedsReviewFromIssue.isDone()).toBe(true)
+    expect(removeTestCloseFromIssue.isDone()).toBe(true)
   })
 
   test('closes issue when deployment is successful in last deploy env', async () => {
@@ -88,6 +138,10 @@ describe('My Probot app', () => {
     nock('https://api.github.com')
       .post('/repos/Toto/testing-repo/issues/1/labels')
       .reply(200)
+
+    nock('https://api.github.com')
+      .get('/repos/Toto/testing-repo/issues/1')
+      .reply(200, { labels: [{ name: 'test-env' }] })
 
     nock('https://api.github.com')
       .delete('/repos/Toto/testing-repo/issues/1/labels/test-env')
