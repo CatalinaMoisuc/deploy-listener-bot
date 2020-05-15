@@ -67,7 +67,7 @@ module.exports = app => {
 
             // this is the last deployment stage, close the issue
             const closingEnv = process.env.CLOSING_ENV
-            const kanbanColumns = process.env.KANBAN_COLUMN_LABELS
+
             if (closingEnv && deployEnvironment === closingEnv) {
               await context.github.issues.update({
                 repo: `${repositoryName}`,
@@ -77,21 +77,36 @@ module.exports = app => {
               })
             }
 
-            // the previous column label should be removed on each deployment
-            if (kanbanColumns && kanbanColumns.includes(KANBAN_COLUMN_LABELS_SEPARATOR)) {
-              const indexOfDeployEnv = kanbanColumns.indexOf(`${deployEnvironment}`)
-              let previousLabel = kanbanColumns.slice(0, indexOfDeployEnv - 1)
-              // when there are more than two labels chained, get only the last one before the deploy env
-              if (previousLabel.includes('|')) {
-                previousLabel = previousLabel.slice(previousLabel.lastIndexOf('|') + 1, previousLabel.length)
-              }
+            const kanbanColumns = process.env.KANBAN_COLUMN_LABELS
+            // any other column label should be removed on each deployment
+            if (kanbanColumns) {
+              const kanbanLabels = kanbanColumns.split(KANBAN_COLUMN_LABELS_SEPARATOR)
 
-              await context.github.issues.removeLabel({
+              // get all the labels on the issue
+              const { data: existentIssue } = await context.github.issues.get({
                 repo: `${repositoryName}`,
                 owner: `${repositoryOwnerLogin}`,
-                issue_number: issueNumber,
-                name: `${previousLabel}`
+                issue_number: issueNumber
               })
+
+              const { labels } = existentIssue
+
+              // keep only the kanban labels on the issue
+              if (labels) {
+                const removableLabels = labels
+                  .filter(label => kanbanLabels.includes(label.name) && deployEnvironment !== label.name)
+                  .map(label => label.name)
+
+                // remove all other kanban labels from the issue
+                for (const previousLabel of removableLabels) {
+                  await context.github.issues.removeLabel({
+                    repo: `${repositoryName}`,
+                    owner: `${repositoryOwnerLogin}`,
+                    issue_number: issueNumber,
+                    name: `${previousLabel}`
+                  })
+                }
+              }
             }
           }
         }
