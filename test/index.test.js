@@ -1,4 +1,7 @@
 const nock = require('nock')
+const { mockAccessToken } = require('./mocks/mock-token')
+const { mockCompare, mockSearch, mockAddLabel, mockRemoveLabel, mockGetIssue, mockCloseIssue } = require('./mocks/mock-oktokit-rest')
+
 // Requiring our app implementation
 const myProbotApp = require('..')
 const { Probot } = require('probot')
@@ -20,6 +23,12 @@ describe('My Probot app', () => {
       mockCert = cert
       done()
     })
+
+    // some tests are timing out with jamine's default (5000ms)
+    jest.setTimeout(6000)
+
+    // Test that we correctly return a test token
+    mockAccessToken()
   })
 
   beforeEach(() => {
@@ -31,38 +40,12 @@ describe('My Probot app', () => {
   })
 
   test('adds and removes labels issue when deployment is successful', async () => {
-    // the post addLabelToIssue is timing out with jamine's default 5000ms
-    jest.setTimeout(6000)
+    mockCompare('test-env-old', '007', { commits: [{ sha: '007' }] })
+    mockSearch('007+repo:Toto/testing-repo', { items: [{ body: '#1', number: '2' }] })
 
-    // Test that we correctly return a test token
-    nock('https://api.github.com')
-      .post('/app/installations/321696/access_tokens')
-      .reply(200, { token: 'test' })
-
-    nock('https://api.github.com')
-      .get('/repos/Toto/testing-repo/compare/test-env-old...007')
-      .reply(200, { commits: [{ sha: '007' }] })
-
-    nock('https://api.github.com')
-      .get('/search/issues?q=007+repo:Toto/testing-repo')
-      .reply(200, { items: [{ body: '#1', number: '2' }] })
-
-    const addLabelToIssue = nock('https://api.github.com')
-      .post('/repos/Toto/testing-repo/issues/1/labels'
-        , (body) => {
-          expect(body).toMatchObject(['test-env'])
-          return true
-        }
-      )
-      .reply(200)
-
-    const getLabelsFromIssue = nock('https://api.github.com')
-      .get('/repos/Toto/testing-repo/issues/1')
-      .reply(200, { labels: [{ name: 'needs review' }] })
-
-    const removeLabelFromIssue = nock('https://api.github.com')
-      .delete('/repos/Toto/testing-repo/issues/1/labels/needs%20review')
-      .reply(200)
+    const getLabelsFromIssue = mockGetIssue('1', { labels: [{ name: 'needs review' }] })
+    const addLabelToIssue = mockAddLabel('1', (body) => { expect(body).toMatchObject(['test-env']) })
+    const removeLabelFromIssue = mockRemoveLabel('1', 'needs%20review')
 
     // Receive a webhook event
     await probot.receive({ name: 'deployment_status', payload: eventPayloadTestEnv })
@@ -74,42 +57,13 @@ describe('My Probot app', () => {
   })
 
   test('removes multiple issue labels', async () => {
-    // the post addLabelToIssue is timing out with jamine's default 5000ms
-    jest.setTimeout(6000)
+    mockCompare('test-env-old', '007', { commits: [{ sha: '007' }] })
+    mockSearch('007+repo:Toto/testing-repo', { items: [{ body: '#1', number: '2' }] })
+    mockGetIssue('1', { labels: [{ name: 'needs review' }, { name: 'test-close' }] })
+    mockAddLabel('1', () => {})
 
-    // Test that we correctly return a test token
-    nock('https://api.github.com')
-      .post('/app/installations/321696/access_tokens')
-      .reply(200, { token: 'test' })
-
-    nock('https://api.github.com')
-      .get('/repos/Toto/testing-repo/compare/test-env-old...007')
-      .reply(200, { commits: [{ sha: '007' }] })
-
-    nock('https://api.github.com')
-      .get('/search/issues?q=007+repo:Toto/testing-repo')
-      .reply(200, { items: [{ body: '#1', number: '2' }] })
-
-    nock('https://api.github.com')
-      .post('/repos/Toto/testing-repo/issues/1/labels'
-        , (body) => {
-          expect(body).toMatchObject(['test-env'])
-          return true
-        }
-      )
-      .reply(200)
-
-    nock('https://api.github.com')
-      .get('/repos/Toto/testing-repo/issues/1')
-      .reply(200, { labels: [{ name: 'needs review' }, { name: 'test-close' }] })
-
-    const removeNeedsReviewFromIssue = nock('https://api.github.com')
-      .delete('/repos/Toto/testing-repo/issues/1/labels/needs%20review')
-      .reply(200)
-
-    const removeTestCloseFromIssue = nock('https://api.github.com')
-      .delete('/repos/Toto/testing-repo/issues/1/labels/test-close')
-      .reply(200)
+    const removeNeedsReviewFromIssue = mockRemoveLabel('1', 'needs%20review')
+    const removeTestCloseFromIssue = mockRemoveLabel('1', 'test-close')
 
     // Receive a webhook event
     await probot.receive({ name: 'deployment_status', payload: eventPayloadTestEnv })
@@ -119,42 +73,13 @@ describe('My Probot app', () => {
   })
 
   test('does not remove the current deploy environment label', async () => {
-    // the post addLabelToIssue is timing out with jamine's default 5000ms
-    jest.setTimeout(6000)
+    mockCompare('test-env-old', '007', { commits: [{ sha: '007' }] })
+    mockSearch('007+repo:Toto/testing-repo', { items: [{ body: '#1', number: '2' }] })
+    mockGetIssue('1', { labels: [{ name: 'needs review' }, { name: 'test-env' }] })
+    mockAddLabel('1', () => {})
 
-    // Test that we correctly return a test token
-    nock('https://api.github.com')
-      .post('/app/installations/321696/access_tokens')
-      .reply(200, { token: 'test' })
-
-    nock('https://api.github.com')
-      .get('/repos/Toto/testing-repo/compare/test-env-old...007')
-      .reply(200, { commits: [{ sha: '007' }] })
-
-    nock('https://api.github.com')
-      .get('/search/issues?q=007+repo:Toto/testing-repo')
-      .reply(200, { items: [{ body: '#1', number: '2' }] })
-
-    nock('https://api.github.com')
-      .post('/repos/Toto/testing-repo/issues/1/labels'
-        , (body) => {
-          expect(body).toMatchObject(['test-env'])
-          return true
-        }
-      )
-      .reply(200)
-
-    nock('https://api.github.com')
-      .get('/repos/Toto/testing-repo/issues/1')
-      .reply(200, { labels: [{ name: 'needs review' }, { name: 'test-env' }] })
-
-    const removeNeedsReviewFromIssue = nock('https://api.github.com')
-      .delete('/repos/Toto/testing-repo/issues/1/labels/needs%20review')
-      .reply(200)
-
-    const removeTestEnvFromIssue = nock('https://api.github.com')
-      .delete('/repos/Toto/testing-repo/issues/1/labels/test-env')
-      .reply(200)
+    const removeNeedsReviewFromIssue = mockRemoveLabel('1', 'needs%20review')
+    const removeTestEnvFromIssue = mockRemoveLabel('1', 'test-env')
 
     // Receive a webhook event
     await probot.receive({ name: 'deployment_status', payload: eventPayloadTestEnv })
@@ -164,42 +89,13 @@ describe('My Probot app', () => {
   })
 
   test('closes issue when deployment is successful in last deploy env', async () => {
-    // the post addLabelToIssue is timing out with jamine's default 5000ms
-    jest.setTimeout(6000)
+    mockCompare('test-close-old', '007', { commits: [{ sha: '007' }] })
+    mockSearch('007+repo:Toto/testing-repo', { items: [{ body: '#1', number: '2' }] })
+    mockGetIssue('1', { labels: [{ name: 'test-env' }] })
+    mockAddLabel('1', (body) => { expect(body).toMatchObject(['test-close']) })
+    mockRemoveLabel('1', 'test-env')
 
-    // Test that we correctly return a test token
-    nock('https://api.github.com')
-      .post('/app/installations/321696/access_tokens')
-      .reply(200, { token: 'test' })
-
-    nock('https://api.github.com')
-      .get('/repos/Toto/testing-repo/compare/test-close-old...007')
-      .reply(200, { commits: [{ sha: '007' }] })
-
-    nock('https://api.github.com')
-      .get('/search/issues?q=007+repo:Toto/testing-repo')
-      .reply(200, { items: [{ body: '#1', number: '2' }] })
-
-    nock('https://api.github.com')
-      .post('/repos/Toto/testing-repo/issues/1/labels')
-      .reply(200)
-
-    nock('https://api.github.com')
-      .get('/repos/Toto/testing-repo/issues/1')
-      .reply(200, { labels: [{ name: 'test-env' }] })
-
-    nock('https://api.github.com')
-      .delete('/repos/Toto/testing-repo/issues/1/labels/test-env')
-      .reply(200)
-
-    const closeIssue = nock('https://api.github.com')
-      .patch('/repos/Toto/testing-repo/issues/1'
-        , (body) => {
-          expect(body).toMatchObject({ state: 'closed' })
-          return true
-        }
-      )
-      .reply(200)
+    const closeIssue = mockCloseIssue('1')
 
     // Receive a webhook event
     await probot.receive({ name: 'deployment_status', payload: eventPayloadTestProd })
