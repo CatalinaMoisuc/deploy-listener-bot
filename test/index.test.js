@@ -41,7 +41,7 @@ describe('My Probot app', () => {
 
   test('adds and removes labels issue when deployment is successful', async () => {
     mockCompare('test-env-old', '007', { commits: [{ sha: '007' }] })
-    mockSearch('007+repo:Toto/testing-repo', { items: [{ body: '#1', number: '2' }] })
+    mockSearch('007+repo:Toto/testing-repo', { items: [{ body: 'Addresses   #1', number: '2' }] })
 
     const getLabelsFromIssue = mockGetIssue('1', { labels: [{ name: 'needs review' }] })
     const addLabelToIssue = mockAddLabel('1', (body) => { expect(body).toMatchObject(['test-env']) })
@@ -58,7 +58,7 @@ describe('My Probot app', () => {
 
   test('removes multiple issue labels', async () => {
     mockCompare('test-env-old', '007', { commits: [{ sha: '007' }] })
-    mockSearch('007+repo:Toto/testing-repo', { items: [{ body: '#1', number: '2' }] })
+    mockSearch('007+repo:Toto/testing-repo', { items: [{ body: 'ADdrEsses #1', number: '2' }] })
     mockGetIssue('1', { labels: [{ name: 'needs review' }, { name: 'test-close' }] })
     mockAddLabel('1', () => {})
 
@@ -74,7 +74,7 @@ describe('My Probot app', () => {
 
   test('does not remove the current deploy environment label', async () => {
     mockCompare('test-env-old', '007', { commits: [{ sha: '007' }] })
-    mockSearch('007+repo:Toto/testing-repo', { items: [{ body: '#1', number: '2' }] })
+    mockSearch('007+repo:Toto/testing-repo', { items: [{ body: 'Addresses #1', number: '2' }] })
     mockGetIssue('1', { labels: [{ name: 'needs review' }, { name: 'test-env' }] })
     mockAddLabel('1', () => {})
 
@@ -90,7 +90,7 @@ describe('My Probot app', () => {
 
   test('closes issue when deployment is successful in last deploy env', async () => {
     mockCompare('test-close-old', '007', { commits: [{ sha: '007' }] })
-    mockSearch('007+repo:Toto/testing-repo', { items: [{ body: '#1', number: '2' }] })
+    mockSearch('007+repo:Toto/testing-repo', { items: [{ body: 'Addresses #1', number: '2' }] })
     mockGetIssue('1', { labels: [{ name: 'test-env' }] })
     mockAddLabel('1', (body) => { expect(body).toMatchObject(['test-close']) })
     mockRemoveLabel('1', 'test-env')
@@ -102,6 +102,25 @@ describe('My Probot app', () => {
 
     // the issue deployed in the last stage was closed
     expect(closeIssue.isDone()).toBe(true)
+  })
+
+  test('does not close or label issue when the closing keyword is not mentioned', async () => {
+    mockCompare('test-close-old', '007', { commits: [{ sha: '007' }] })
+    mockSearch('007+repo:Toto/testing-repo', { items: [{ body: '#1', number: '2' }] })
+    const getIssue = mockGetIssue('1', { labels: [{ name: 'test-env' }] })
+    const addLabel = mockAddLabel('1', (body) => { expect(body).toMatchObject(['test-close']) })
+    const removeLabel = mockRemoveLabel('1', 'test-env')
+
+    const closeIssue = mockCloseIssue('1')
+
+    // Receive a webhook event
+    await probot.receive({ name: 'deployment_status', payload: eventPayloadTestProd })
+
+    // the issue deployed in the last stage was closed
+    expect(getIssue.isDone()).toBe(false)
+    expect(addLabel.isDone()).toBe(false)
+    expect(removeLabel.isDone()).toBe(false)
+    expect(closeIssue.isDone()).toBe(false)
   })
 
   afterEach(() => {

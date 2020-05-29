@@ -13,7 +13,7 @@ module.exports = app => {
   app.on('deployment_status.created', async context => {
     const deployStatus = context.payload.deployment_status.state
 
-    if (deployStatus === 'success') {
+    if (deployStatus && deployStatus === 'success') {
       const deployCommitSha = context.payload.deployment.sha
       const deployEnvironment = context.payload.deployment.environment
 
@@ -33,78 +33,84 @@ module.exports = app => {
       const { commits } = comparison.data
 
       // for each commit sha
-      for (const commit of commits) {
-        app.log(`Handling deployment head commit: ${commit.sha}`)
+      if (commits) {
+        for (const commit of commits) {
+          app.log(`Handling deployment head commit: ${commit.sha}`)
 
-        const query = `${commit.sha}+repo:${repositoryFullName}`
+          const query = `${commit.sha}+repo:${repositoryFullName}`
 
-        // find all pull requests that contained this commit sha
-        const { data } = await context.github.search.issuesAndPullRequests({
-          q: query
-        })
-        const { items } = data
+          // find all pull requests that contained this commit sha
+          const { data } = await context.github.search.issuesAndPullRequests({
+            q: query
+          })
+          const { items } = data
 
-        // for each pull request that contains a deployed commit hash
-        for (const pr of items) {
-          app.log(`Handling pr: ${pr.number}`)
-          const body = pr.body
+          // for each pull request that contains a deployed commit hash
+          if (items) {
+            for (const pr of items) {
+              app.log(`Handling pr: ${pr.number}`)
+              const body = pr.body
 
-          // match all issue numbers mentioned in the description
-          const issuesMentioned = body.match(/#[0-9]+/g)
-          app.log(`Handling the following mentioned issues: ${issuesMentioned}`)
+              const regexp = new RegExp(`${process.env.PR_ISSUE_LINK_KEYWORD}[ ]+#[0-9]+`, 'gi')
+              const issuesMentioned = body.match(regexp)
+              // match all issue numbers mentioned in the description
+              app.log(`Handling the following mentioned issues: ${issuesMentioned}`)
 
-          // and label each issue mentioned in the PRs description with the environment label
-          for (const issue of issuesMentioned) {
-            const issueNumber = parseInt(issue.slice(1))
-            app.log(`Handling issue: ${issueNumber}`)
+              // and label each issue mentioned in the PRs description with the environment label
+              if (issuesMentioned) {
+                for (const issue of issuesMentioned) {
+                  const issueNumber = parseInt(issue.match(/#[0-9]+/gi)[0].slice(1))
+                  app.log(`Handling issue: ${issueNumber}`)
 
-            await context.github.issues.addLabels({
-              repo: `${repositoryName}`,
-              owner: `${repositoryOwnerLogin}`,
-              issue_number: issueNumber,
-              labels: [`${deployEnvironment}`]
-            })
-
-            // this is the last deployment stage, close the issue
-            const closingEnv = process.env.CLOSING_ENV
-
-            if (closingEnv && deployEnvironment === closingEnv) {
-              await context.github.issues.update({
-                repo: `${repositoryName}`,
-                owner: `${repositoryOwnerLogin}`,
-                issue_number: issueNumber,
-                state: 'closed'
-              })
-            }
-
-            const kanbanColumns = process.env.KANBAN_COLUMN_LABELS
-            // any other column label should be removed on each deployment
-            if (kanbanColumns) {
-              const kanbanLabels = kanbanColumns.split(KANBAN_COLUMN_LABELS_SEPARATOR)
-
-              // get all the labels on the issue
-              const { data: existentIssue } = await context.github.issues.get({
-                repo: `${repositoryName}`,
-                owner: `${repositoryOwnerLogin}`,
-                issue_number: issueNumber
-              })
-
-              const { labels } = existentIssue
-
-              // keep only the kanban labels on the issue
-              if (labels) {
-                const removableLabels = labels
-                  .filter(label => kanbanLabels.includes(label.name) && deployEnvironment !== label.name)
-                  .map(label => label.name)
-
-                // remove all other kanban labels from the issue
-                for (const previousLabel of removableLabels) {
-                  await context.github.issues.removeLabel({
+                  await context.github.issues.addLabels({
                     repo: `${repositoryName}`,
                     owner: `${repositoryOwnerLogin}`,
                     issue_number: issueNumber,
-                    name: `${previousLabel}`
+                    labels: [`${deployEnvironment}`]
                   })
+
+                  // this is the last deployment stage, close the issue
+                  const closingEnv = process.env.CLOSING_ENV
+
+                  if (closingEnv && deployEnvironment === closingEnv) {
+                    await context.github.issues.update({
+                      repo: `${repositoryName}`,
+                      owner: `${repositoryOwnerLogin}`,
+                      issue_number: issueNumber,
+                      state: 'closed'
+                    })
+                  }
+
+                  const kanbanColumns = process.env.KANBAN_COLUMN_LABELS
+                  // any other column label should be removed on each deployment
+                  if (kanbanColumns) {
+                    const kanbanLabels = kanbanColumns.split(KANBAN_COLUMN_LABELS_SEPARATOR)
+
+                    // get all the labels on the issue
+                    const { data: existentIssue } = await context.github.issues.get({
+                      repo: `${repositoryName}`,
+                      owner: `${repositoryOwnerLogin}`,
+                      issue_number: issueNumber
+                    })
+
+                    const { labels } = existentIssue
+                    if (labels) {
+                      const removableLabels = labels
+                        .filter(label => kanbanLabels.includes(label.name) && deployEnvironment !== label.name)
+                        .map(label => label.name)
+
+                      // remove all other kanban labels from the issue
+                      // keep only the deploy environment label
+                      for (const previousLabel of removableLabels) {
+                        await context.github.issues.removeLabel({
+                          repo: `${repositoryName}`,
+                          owner: `${repositoryOwnerLogin}`,
+                          issue_number: issueNumber,
+                          name: `${previousLabel}`
+                        })
+                      }
+                    }
+                  }
                 }
               }
             }
